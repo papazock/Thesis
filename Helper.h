@@ -7,7 +7,7 @@
 typedef struct TheResult {
     int **motionVect;
     int computations;
-    int mVrow;
+    int mvRow;
     int mvCol;
 } TheResult;
 

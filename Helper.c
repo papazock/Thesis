@@ -9,7 +9,7 @@ TheResult *createReturnStruct(int **motionVectors, int computations, int mRow, i
     TheResult *result = malloc(sizeof(TheResult));
     result->motionVect = motionVectors;
     result->computations = computations;
-    result->mVrow = mRow;
+    result->mvRow = mRow;
     result->mvCol = mCol;
     return result;
 }
