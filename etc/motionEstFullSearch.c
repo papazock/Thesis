@@ -65,6 +65,7 @@ TheResult *motionEstES(int **imgP, int **imgI, int mbSize, int p, int _row, int 
             vectors[0][mbCount] = dy - p - 1;    // row co-ordinate for the vector
             vectors[1][mbCount] = dx - p - 1;    // col co-ordinate for the vector
             mbCount = mbCount + 1;
+            free(costs);
             costs = createVector(2 * p + 1, 2 * p + 1, 65537);
 
         }
