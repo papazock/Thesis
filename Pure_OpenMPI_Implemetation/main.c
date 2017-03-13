@@ -115,8 +115,8 @@ previous4=0;
         M_B++;
     }
     if (world_rank == 0)
-    printf("Arguments: N=%d, M=%d, B=%d, p=%d, sframe=%d, nframes=%d, sequence=%s, N_B=%d, M_B=%d\n", N, M, B, p,
-           sframe, nframes, filename, N_B, M_B);
+        printf("Arguments: N=%d, M=%d, B=%d, p=%d, sframe=%d, nframes=%d, sequence=%s, N_B=%d, M_B=%d\n", N, M, B, p,
+               sframe, nframes, filename, N_B, M_B);
 
 
 
@@ -165,8 +165,6 @@ previous4=0;
         //Time measurement
         clock_gettime(CLOCK_MONOTONIC, &start);
     }
-
-
 
 
     for (i = sframe; i < nframes + sframe; i++) {

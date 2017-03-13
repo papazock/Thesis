@@ -9,9 +9,10 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>    //for close
-#include <mpi.h>
 
 #include "globals.h"
+
+#include "3slog_cuda.h"
 
 
 // Cleanup function
@@ -23,6 +24,7 @@ void exit_function(void) {
     free(outputframe);
     free(motion_vectors_x);
     free(motion_vectors_y);
+    freeMemory();
 }
 
 
@@ -47,43 +49,16 @@ previous4=0;
 */
 
 
-    MPI_Init(&argc, &argv);
-
-
-    // Get the number of processes
-    int world_size;
-    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-
-    // Get the rank of the process
-    int world_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-
-    // Get the name of the processor
-    char processor_name[MPI_MAX_PROCESSOR_NAME];
-    int name_len;
-    MPI_Get_processor_name(processor_name, &name_len);
-
-    // Print off a hello world message
-    printf("Hello world from processor %s, rank %d"
-                   " out of %d processors\n", processor_name, world_rank, world_size);
-
-
-
-
 //The first step is to parse all command line parameters
     if (argc < 7) {
-        if (world_rank == 0) {
-            printf("7 variables are required: N M B p startingframe number_frames_to_process sequence\n");
-            printf("Example: ./main 720 576 16 7 0 1 barb.yuv\n");
-        }
+        printf("7 variables are required: N M B p startingframe number_frames_to_process sequence\n");
+        printf("Example: ./main 720 576 16 7 0 1 barb.yuv\n");
         exit(-3);
     }
 
 
 //Register the exit function
     atexit(*exit_function);
-
-
 
 
 //We will use this for our filename
@@ -105,16 +80,14 @@ previous4=0;
 
 //Check if we have a full division
     if (N % B != 0) {
-        if (world_rank == 0)
-            printf("Warning: N Not fully divided. Fixing it\n");
+        printf("Warning: N Not fully divided. Fixing it\n");
         N_B++;
     }
     if (M % B != 0) {
-        if (world_rank == 0)
-            printf("Warning: M Not fully divided. Fixing it\n");
+        printf("Warning: M Not fully divided. Fixing it\n");
         M_B++;
     }
-    if (world_rank == 0)
+
     printf("Arguments: N=%d, M=%d, B=%d, p=%d, sframe=%d, nframes=%d, sequence=%s, N_B=%d, M_B=%d\n", N, M, B, p,
            sframe, nframes, filename, N_B, M_B);
 
@@ -127,7 +100,7 @@ previous4=0;
 
     struct timespec start, end; // The time variables
 
-
+    //double snr = 0.0;
 
 
     picturefp = opensequence(filename);
@@ -159,58 +132,47 @@ previous4=0;
         perror("Memory cannot be allocated to output");
         exit(-2);
     }
+//
+//    int* motion_vectors_x2 = (int *) calloc((N_B) * (M_B) * sizeof(int), 1);
+//    if (motion_vectors_x == NULL) {
+//        perror("Memory cannot be allocated to output");
+//        exit(-2);
+//    }
+//    int* motion_vectors_y2 = (int *) calloc((N_B) * (M_B) * sizeof(int), 1);
+//    if (motion_vectors_y == NULL) {
+//        perror("Memory cannot be allocated to output");
+//        exit(-2);
+//    }
+
+    initValuesAndAllocateMemory(M_B, N_B, B, M, N);
+
+    cudaThreads = 280;
 
 
-    if (world_rank == 0) {
+    {
         //Time measurement
         clock_gettime(CLOCK_MONOTONIC, &start);
     }
 
 
-
-
     for (i = sframe; i < nframes + sframe; i++) {
 
-        if (i % world_size != world_rank) {
-            continue;
-        }
         readframe2(picturefp, currentframe, i, N, M);
-
         readframe2(picturefp, previousframe, i - 1, N, M);
 
-        log_motion_estimation(currentframe, previousframe, motion_vectors_x, motion_vectors_y);
 
-
-        //OLD way, by using static arrays
-        //read_sequenceFRAME(currentframe,previousframe);
-        //SNR 15.12
-        //writeframe2(currentframe);printf("SNR=%f\n",SNR2(previousframe,currentframe));exit(0);
-        //log_motion_estimationFRAME(currentframe,previousframe,motion_vectors_x,motion_vectors_y);
-
-        //for every frame processed, print a dot
+        //zero_array_uint8(outputframe,N+1,M+1);
+        initKernelAndStartIt(currentframe, previousframe, motion_vectors_x, motion_vectors_y);
+//
         printf(".");
         //Clear the buffer to print the dot
         fflush(NULL);
     }
 
 
-// Let the threads process all tasks
-
-
-// Further parallel processing ...
-
-
-
-
-
-
-
-
-
-    MPI_Barrier(MPI_COMM_WORLD);
 // END of check
-    if (world_rank == 0) {
-//Time measurement
+    {
+        //Time measurement
         clock_gettime(CLOCK_MONOTONIC, &end);
 
         const int DAS_NANO_SECONDS_IN_SEC = 1000000000;
@@ -221,24 +183,22 @@ previous4=0;
             timeElapsed_s--;
         }
 
-        printf("\nTime: %ld.%09ld secs \n", timeElapsed_s, timeElapsed_n);
+        printf("\n Cuda Threads %d Time: %ld.%09ld secs \n", cudaThreads, timeElapsed_s, timeElapsed_n);
     }
 
-    MPI_Finalize();
+    //for test uncomment the following
+    //zero_array_int(motion_vectors_x,N_B,M_B);
+    //zero_array_int(motion_vectors_y,N_B,M_B);
 
-//for test uncomment the following
-//zero_array_int(motion_vectors_x,N_B,M_B);
-//zero_array_int(motion_vectors_y,N_B,M_B);
+    //old: static frame based
+    //motion_compensationFRAME(previousframe,motion_vectors_x,motion_vectors_y,outputframe);
+    //snr=SNRFRAME(currentframe,outputframe);
 
-//old: static frame based
-//motion_compensationFRAME(previousframe,motion_vectors_x,motion_vectors_y,outputframe);
-//snr=SNRFRAME(currentframe,outputframe);
-
-//New with pointers
-    //motion_compensation2(previousframe, motion_vectors_x, motion_vectors_y, outputframe);
-    // snr = SNR2(currentframe, outputframe);
-    //writeframe2(outputframe);
-    //printf("SNR = %f\n", snr);
+    //New with pointers
+    // motion_compensation2(previousframe, motion_vectors_x, motion_vectors_y, outputframe);
+    //snr = SNR2(currentframe, outputframe);
+    // writeframe2(outputframe);
+    // printf("SNR = %f\n", snr);
 
 
     return 0;

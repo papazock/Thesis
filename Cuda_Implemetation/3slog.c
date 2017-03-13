@@ -4,7 +4,7 @@
 
 /* Update 2014 with parametrized input */
 #include <stdlib.h>
-#include <omp.h>
+
 #include "globals.h"
 
 
@@ -15,14 +15,6 @@ void log_motion_estimation(uint8 *current, uint8 *previous, int *vectors_x, int 
             vectors_x[c * M_B + b] = 0;
             vectors_y[c * M_B + b] = 0;
         }
-#pragma omp parallel
-#pragma omp single
-    {
-        int nThreads = omp_get_num_threads();
-        int ncpus = omp_get_num_procs();
-        printf("Number of Threads: %d\n Number of Cores(reported by system): %d\n ", nThreads, ncpus);
-    }
-#pragma omp parallel for
     for (x = 0; x < N_B; x++) {
         int y;/* For all blocks in the current frame */
         for (y = 0; y < M_B; y++) {
@@ -74,14 +66,13 @@ void log_motion_estimation(uint8 *current, uint8 *previous, int *vectors_x, int 
                     }
                 // d=d/2;
                 int at = x * M_B + y;
-#pragma omp atomic
+
                 vectors_x[at] += bestx;
-#pragma omp atomic
+
                 vectors_y[at] += besty;
 
             }
         }
     }
 }
-
 
